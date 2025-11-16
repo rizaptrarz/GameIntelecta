@@ -6,13 +6,13 @@ using UnityEngine;
 
 public class GrabScript : MonoBehaviour
 {
-
     [SerializeField] private Camera cam;
     [SerializeField] private float extraPullForce;
     private bool grabbed;
     private GameObject grabbedObj;
     private Rigidbody2D grabbedRb;
     private SpringJoint2D grabJoint;
+    [SerializeField]private float grabDistance;
     bool cooldown;
     void Update()
     {
@@ -28,7 +28,12 @@ public class GrabScript : MonoBehaviour
         RaycastHit2D hit = Physics2D.Raycast(mousePos, Vector3.forward);
         if (Input.GetMouseButtonDown(0) && hit.collider != null && !grabbed)
         {
-            Vector2 grabPoint = new Vector2(hit.collider.transform.position.x - hit.point.x, hit.collider.transform.position.y - hit.point.y);
+            float distanceToPlayer = Vector2.Distance(hit.collider.gameObject.transform.position, transform.position);
+            if(hit.collider.tag != "Grabbable" || distanceToPlayer > grabDistance)
+            {
+                return;
+            }
+            Vector2 grabPoint = hit.collider.transform.InverseTransformPoint(hit.point);
             Pickup(hit.collider.gameObject, grabPoint);
         }
         else if (grabbed)
@@ -45,9 +50,17 @@ public class GrabScript : MonoBehaviour
 
     private void HandleGrab()
     {
+        float distanceToPlayer = Vector2.Distance(gameObject.transform.position, grabbedObj.transform.position);
+            if(distanceToPlayer > grabDistance)
+            {
+                drop();
+                return;
+            }
+        
         Vector2 mousePos = cam.ScreenToWorldPoint(Input.mousePosition);
         grabJoint.connectedAnchor = mousePos;
         grabJoint.distance = -1;
+        
 
         Vector2 dir = mousePos - (Vector2)grabbedObj.transform.position;
         grabbedRb.AddForce(dir.normalized * extraPullForce);
@@ -57,20 +70,26 @@ public class GrabScript : MonoBehaviour
     {
         grabbedObj = obj;
         grabbedRb = obj.GetComponent<Rigidbody2D>();
+        grabbedRb.drag = 4;
+        grabbedRb.angularDrag = 4;
         grabbed = true;
         grabJoint = obj.AddComponent<SpringJoint2D>();
         grabJoint.enableCollision = true;
         grabJoint.anchor = grabPoint;
-        grabJoint.frequency = 3;
+        grabJoint.frequency = 10;
         grabJoint.dampingRatio = 1;
+        grabJoint.autoConfigureDistance = false;
+
         
     }
-
     public void drop()
     {
         if(grabbed)
         {
+            grabbedRb.drag = 0;
+            grabbedRb.angularDrag = 0.05f;
             Destroy(grabbedObj.GetComponent<SpringJoint2D>());
+            grabbedObj = null;
             grabbed = false;
         }
 
